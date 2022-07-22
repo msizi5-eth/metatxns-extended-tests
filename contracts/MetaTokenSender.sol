@@ -16,17 +16,28 @@ contract RandomToken is ERC20 {
 contract TokenSender {
     using ECDSA for bytes32;
 
+    mapping(bytes32 => bool) executed;
+
     function transfer(
         address sender,
         uint256 amount,
         address recipient,
         address tokenContract,
+        uint256 nonce,
         bytes memory signature
     ) public {
-        bytes32 messageHash = getHash(sender, amount, recipient, tokenContract);
+        bytes32 messageHash = getHash(
+            sender,
+            amount,
+            recipient,
+            tokenContract,
+            nonce
+        );
         bytes32 signedMessageHash = messageHash.toEthSignedMessageHash();
+        require(!executed[signedMessageHash], "Already executed!");
         address signer = signedMessageHash.recover(signature);
         require(signer == sender, "Signature does not come from sender");
+        executed[signedMessageHash] = true;
         bool sent = ERC20(tokenContract).transferFrom(
             sender,
             recipient,
@@ -39,11 +50,18 @@ contract TokenSender {
         address sender,
         uint256 amount,
         address recipient,
-        address tokenContract
+        address tokenContract,
+        uint256 nonce
     ) public pure returns (bytes32) {
         return
             keccak256(
-                abi.encodePacked(sender, amount, recipient, tokenContract)
+                abi.encodePacked(
+                    sender,
+                    amount,
+                    recipient,
+                    tokenContract,
+                    nonce
+                )
             );
     }
 }
